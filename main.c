@@ -22,7 +22,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 #ifdef WIN32
     #define WIN32_LEAN_AND_MEAN
@@ -46,6 +46,7 @@
 typedef int (*csvhandler)(const char*, const char*);
 
 struct sockaddr_in serveraddr;
+int debug = 0;
 
 
 /* Salt for Winlink 2000 secure login */
@@ -193,12 +194,18 @@ void usage(
         const char* appname
     )
 {
-    printf("Usage: %s MAPFILE\n\n", appname);
+    printf("Usage: %s [OPTIONS] MAPFILE\n\n", appname);
     printf("Renews the WinLink account subscription for every callsign listed "
            "in MAPFILE,\nwhich should be a newline delineated listed of "
            "callsigns and WinLink account\npasswords, separated by a comma "
            "(CSV format).\n\n");
-    printf("Copyright © 2019 Darryl Pogue (VA7DPO) <darryl@dpogue.ca>\n");
+    printf("OPTIONS\n");
+    printf("    -h, --help        Print this help message.\n");
+    printf("    -v, --verbose     Print additional debugging information.\n");
+#if DEBUG
+    printf("    --test            Run tests, will not renew anything!\n");
+#endif
+    printf("\nCopyright © 2019 Darryl Pogue (VA7DPO) <darryl@dpogue.ca>\n");
     printf("Released under the GNU General Public Licence, version 3 or "
            "later.\n");
 }
@@ -330,25 +337,25 @@ int wlrenew(
             }
         }
 
-        #if DEBUG
-        printf(">debug] %s\n", ptr);
-        #endif
+        if (debug) {
+            printf("   > %s\n", ptr);
+        }
 
         if (!strncmp("Callsign :", ptr, 10)) {
             snprintf(reply, 32, ".%s\r", callsign);
             write(sd, reply, strlen(reply));
-            #if DEBUG
-            printf("<reply] %s\n", reply);
-            #endif
+            if (debug) {
+                printf("   < %s\n", reply);
+            }
             continue;
         }
 
         if (!strncmp("Password :", ptr, 10)) {
             snprintf(reply, 32, "CMSTELNET\r");
             write(sd, reply, strlen(reply));
-            #if DEBUG
-            printf("<reply] %s\n", reply);
-            #endif
+            if (debug) {
+                printf("   < %s\n", reply);
+            }
             continue;
         }
 
@@ -383,15 +390,15 @@ int wlrenew(
                 strcat(reply, "\r");
 
                 write(sd, reply, strlen(reply));
-                #if DEBUG
-                printf("<reply] %s\n", reply);
-                #endif
+                if (debug) {
+                    printf("   < %s\n", reply);
+                }
             } else {
                 snprintf(reply, 32, "FQ\r");
                 write(sd, reply, strlen(reply));
-                #if DEBUG
-                printf("<reply] %s\n", reply);
-                #endif
+                if (debug) {
+                    printf("   < %s\n", reply);
+                }
             }
             continue;
         }
@@ -401,35 +408,35 @@ int wlrenew(
             if (strlen(challenge) > 0) {
                 snprintf(reply, 32, ";FW: %s\r", callsign);
                 write(sd, reply, strlen(reply));
-                #if DEBUG
-                printf("<reply] %s\n", reply);
-                #endif
+                if (debug) {
+                    printf("   < %s\n", reply);
+                }
 
                 wlsecauth(challenge, passwd, reply);
 
                 write(sd, SID, strlen(SID));
-                #if DEBUG
-                printf("<reply] %s\n", SID);
-                #endif
+                if (debug) {
+                    printf("   < %s\n", SID);
+                }
 
                 write(sd, reply, strlen(reply));
-                #if DEBUG
-                printf("<reply] %s\n", reply);
-                #endif
+                if (debug) {
+                    printf("   < %s\n", reply);
+                }
 
                 challenge[0] = '\0';
 
                 snprintf(reply, 32, "FF\r");
                 write(sd, reply, strlen(reply));
-                #if DEBUG
-                printf("<reply] %s\n", reply);
-                #endif
+                if (debug) {
+                    printf("   < %s\n", reply);
+                }
             } else {
                 snprintf(reply, 32, "BYE\r");
                 write(sd, reply, strlen(reply));
-                #if DEBUG
-                printf("<reply] %s\n", reply);
-                #endif
+                if (debug) {
+                    printf("   < %s\n", reply);
+                }
             }
             continue;
         }
@@ -437,17 +444,17 @@ int wlrenew(
         if (!strncmp("***", ptr, 3)) {
             error++;
 
-            #if !DEBUG
-            printf("%s > %s\n", callsign, ptr);
-            #endif
+            if (!debug) {
+                printf("%s > %s\n", callsign, ptr);
+            }
         }
     }
 
     if (!error) {
         if (proposals) {
-            printf("Renewed %s \x1b[33m(%ld messages pending)\x1b[0m\n", callsign, proposals);
+            printf("\x1b[1mRenewed %s\x1b[0m \x1b[33m(%ld messages pending)\x1b[0m\n", callsign, proposals);
         } else {
-            printf("Renewed %s\n", callsign);
+            printf("\x1b[1mRenewed %s\x1b[0m\n", callsign);
         }
     }
 
@@ -542,6 +549,7 @@ int main(
 {
     FILE* fd;
     char* filename;
+    int i;
 
 #ifdef WIN32
     WSADATA ws;
@@ -564,29 +572,48 @@ int main(
         return 1;
     }
 
-    if (!strcmp(argv[1], "--help") || !strcmp(argv[1], "-h")) {
-        usage(argv[0]);
-        return 0;
-    }
+    filename = NULL;
 
-    filename = argv[1];
+    for (i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
+            usage(argv[0]);
+            return 0;
+        }
 
-    if (!strcmp(argv[1], "--test")) {
-        char buffer[16];
+        else if (!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-v")) {
+            debug = 1;
+        }
 
-        wlsecauth("23753528", "FOOBAR", buffer);
+#if DEBUG
+        else if (!strcmp(argv[i], "--test")) {
+            char buffer[16];
 
-        printf("Auth Test: Expected \";PR: 72768415\" and got %s\n", buffer);
+            wlsecauth("23753528", "FOOBAR", buffer);
 
-        if (argc > 2) {
-            filename = argv[2];
-        } else {
-            filename = "test.csv";
+            printf("Auth Test: Expected \";PR: 72768415\" and got %s\n", buffer);
+
+            if (filename == NULL) {
+                filename = "test.csv";
+            }
+        }
+#endif
+
+        else {
+            filename = argv[i];
         }
     }
 
+    if (filename == NULL) {
+        usage(argv[0]);
+        return 1;
+    }
+
+#if DEBUG
+    debug = 1;
+#endif
+
     if ((fd = fopen(filename, "r")) == NULL) {
-        perror(argv[1]);
+        perror(filename);
         return 2;
     }
 
