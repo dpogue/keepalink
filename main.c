@@ -20,18 +20,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #define DEBUG 0
 
 #ifdef WIN32
+    #include <io.h>
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
     #include <winsock2.h>
     #include <ws2tcpip.h>
 
+    #pragma comment(lib, "Ws2_32.lib")
+
     #define SHUT_RDWR SD_BOTH
+    #define ssize_t SSIZE_T
+    #define close closesocket
+    #define write(a, b, c) send(a, b, c, 0)
+    #define read(a, b, c) recv (a, b, c, 0)
 #else
+    #include <unistd.h>
     #include <arpa/inet.h>
     #include <netdb.h>
     #include <netinet/in.h>
@@ -46,7 +53,7 @@
 typedef int (*csvhandler)(const char*, const char*);
 
 struct sockaddr_in serveraddr;
-int debug = 0;
+int debug = 1;
 
 
 /* Salt for Winlink 2000 secure login */
