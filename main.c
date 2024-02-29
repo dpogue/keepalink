@@ -53,7 +53,7 @@
 typedef int (*csvhandler)(const char*, const char*);
 
 struct sockaddr_in serveraddr;
-int debug = 1;
+int debug = 0;
 
 
 /* Salt for Winlink 2000 secure login */
