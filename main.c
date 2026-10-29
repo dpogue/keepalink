@@ -48,7 +48,8 @@
 #define WL2K_HOST "server.winlink.org"
 #define WL2K_PORT 8772
 
-#define SID "[Keepalink-0.1-B2FIHM$]\r"
+//#define SID "[Keepalink-0.1-B2FIHM$]\r"
+#define SID "[RMS Express-1.7.28.0-B2FIHM$]\r"
 
 typedef int (*csvhandler)(const char*, const char*);
 
